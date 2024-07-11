@@ -1,3 +1,10 @@
+// User authentication
+let currentUser = null;
+const users = JSON.parse(localStorage.getItem('users')) || {};
+
+// Admin credentials (in a real application, this should be handled securely on the server)
+const ADMIN_PASSWORD = 'admin1234'; // Replace with a secure password
+ 
 // DOM Elements
 const userInfo = document.getElementById('user-info');
 const userName = document.getElementById('user-name');
@@ -11,14 +18,157 @@ const authTitle = document.getElementById('auth-title');
 const authMessage = document.getElementById('auth-message');
 const authClose = document.getElementById('auth-close');
 const quizContainer = document.getElementById('quiz-container');
-const sectionTitle = document.getElementById('section-title');
-const questionContainer = document.getElementById('question-container');
-const prevBtn = document.getElementById('prev-btn');
-const nextBtn = document.getElementById('next-btn');
 const landingPage = document.getElementById('landing-page');
 const adminDashboard = document.getElementById('admin-dashboard');
 
-// Quiz Data
+// Event Listeners
+loginBtn.addEventListener('click', () => showAuthForm('Login'));
+signupBtn.addEventListener('click', () => showAuthForm('Sign Up'));
+logoutBtn.addEventListener('click', logout);
+startQuizBtn.addEventListener('click', startQuiz);
+authForm.addEventListener('submit', handleAuth);
+authClose.addEventListener('click', closeAuthModal);
+
+window.addEventListener('click', (event) => {
+    if (event.target === authContainer) {
+        closeAuthModal();
+    }
+});
+
+function showAuthForm(type) {
+    authTitle.textContent = type;
+    authContainer.style.display = 'block';
+    landingPage.style.display = 'none';
+}
+
+function closeAuthModal() {
+    authContainer.style.display = 'none';
+    authMessage.textContent = '';
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    landingPage.style.display = 'block';
+}
+
+function handleAuth(e) {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    if (authTitle.textContent === 'Sign Up') {
+        if (username.toLowerCase() === 'admin') {
+            authMessage.textContent = 'Cannot create an account with username "admin".';
+        } else if (users[username]) {
+            authMessage.textContent = 'Username already exists. Please choose a different one.';
+        } else {
+            users[username] = { password, quizProgress: {} };
+            localStorage.setItem('users', JSON.stringify(users));
+            login(username);
+        }
+    } else { // Login
+        if (username.toLowerCase() === 'admin' && password === ADMIN_PASSWORD) {
+            loginAsAdmin();
+        } else if (users[username] && users[username].password === password) {
+            login(username);
+        } else {
+            authMessage.textContent = 'Invalid username or password.';
+        }
+    }
+}
+
+function login(username) {
+    currentUser = username;
+    userName.textContent = username;
+    loginBtn.style.display = 'none';
+    signupBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+    authContainer.style.display = 'none';
+    landingPage.style.display = 'block';
+    authMessage.textContent = '';
+}
+
+function loginAsAdmin() {
+    currentUser = 'admin';
+    userName.textContent = 'Admin';
+    loginBtn.style.display = 'none';
+    signupBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+    authContainer.style.display = 'none';
+    showAdminDashboard();
+}
+
+function logout() {
+    currentUser = null;
+    userName.textContent = '';
+    loginBtn.style.display = 'inline-block';
+    signupBtn.style.display = 'inline-block';
+    logoutBtn.style.display = 'none';
+    quizContainer.style.display = 'none';
+    adminDashboard.style.display = 'none';
+    landingPage.style.display = 'block';
+}
+
+function startQuiz() {
+    if (currentUser) {
+        landingPage.style.display = 'none';
+        quizContainer.style.display = 'block';
+        loadQuestion();
+        updateProgressBar();
+    } else {
+        authMessage.textContent = 'Please login or sign up to start the quiz.';
+        showAuthForm('Login');
+    }
+}
+
+function showAdminDashboard() {
+    hideAllSections();
+    adminDashboard.style.display = 'block';
+    updateAdminDashboard();
+}
+
+function updateAdminDashboard() {
+    const totalUsers = Object.keys(users).length;
+    const completedUsers = Object.values(users).filter(user => 
+        user.quizProgress && Object.keys(user.quizProgress).length === quizData.length
+    ).length;
+    const incompleteUsers = totalUsers - completedUsers;
+
+    document.getElementById('total-users').textContent = totalUsers;
+    document.getElementById('completed-users').textContent = completedUsers;
+    document.getElementById('incomplete-users').textContent = incompleteUsers;
+
+    const userTableBody = document.querySelector('#user-table tbody');
+    userTableBody.innerHTML = '';
+
+    Object.entries(users).forEach(([username, userData]) => {
+        const row = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        const statusCell = document.createElement('td');
+        const scoreCell = document.createElement('td');
+
+        nameCell.textContent = username;
+        
+        const isCompleted = userData.quizProgress && Object.keys(userData.quizProgress).length === quizData.length;
+        statusCell.textContent = isCompleted ? 'Completed' : 'Incomplete';
+        
+        if (isCompleted) {
+            const totalScore = Object.values(userData.quizProgress).reduce((sum, section) => 
+                sum + Object.values(section).reduce((sectionSum, score) => sectionSum + score, 0), 0
+            );
+            const totalQuestions = quizData.reduce((sum, section) => sum + section.questions.length, 0);
+            scoreCell.textContent = (totalScore / totalQuestions).toFixed(2);
+        } else {
+            scoreCell.textContent = 'N/A';
+        }
+
+        row.appendChild(nameCell);
+        row.appendChild(statusCell);
+        row.appendChild(scoreCell);
+        userTableBody.appendChild(row);
+    });
+}
+
+
+// Quiz data and functionality
 const quizData = [
     {
         title: "1. Sales and Marketing Skills",
@@ -118,162 +268,15 @@ const quizData = [
     }
 ];
 
-// Variables
-let currentUser = null;
+
 let currentSection = 0;
 let currentQuestion = 0;
-
-// Event Listeners
-loginBtn.addEventListener('click', () => showAuthForm('Login'));
-signupBtn.addEventListener('click', () => showAuthForm('Sign Up'));
-logoutBtn.addEventListener('click', logout);
-startQuizBtn.addEventListener('click', startQuiz);
-authForm.addEventListener('submit', handleAuth);
-authClose.addEventListener('click', closeAuthModal);
-prevBtn.addEventListener('click', previousQuestion);
-nextBtn.addEventListener('click', nextQuestion);
-
-// Functions
-function showAuthForm(type) {
-    authTitle.textContent = type;
-    authContainer.style.display = 'block';
-    landingPage.style.display = 'none';
-}
-
-function closeAuthModal() {
-    authContainer.style.display = 'none';
-    authMessage.textContent = '';
-    document.getElementById('username').value = '';
-    document.getElementById('password').value = '';
-    landingPage.style.display = 'block';
-}
-
-function validateForm() {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    if (username.length < 3 || password.length < 6) {
-        authMessage.textContent = "Username must be at least 3 characters and password at least 6 characters.";
-        return false;
-    }
-    return true;
-}
-
-function handleAuth(e) {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const action = authTitle.textContent === 'Sign Up' ? 'register' : 'login';
-
-    $.ajax({
-        url: 'auth.php',
-        method: 'POST',
-        data: { action, username, password },
-        dataType: 'json',
-        beforeSend: showLoading,
-        complete: hideLoading,
-        success: function(response) {
-            if (response.success) {
-                if (action === 'login' && response.is_admin) {
-                    loginAsAdmin();
-                } else {
-                    login(username);
-                }
-            } else {
-                authMessage.textContent = response.message;
-            }
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.error("AJAX error: " + textStatus + ' : ' + errorThrown);
-            alert("An error occurred. Please try again.");
-        }
-    });
-}
-
-function login(username) {
-    currentUser = username;
-    userName.textContent = username;
-    loginBtn.style.display = 'none';
-    signupBtn.style.display = 'none';
-    logoutBtn.style.display = 'inline-block';
-    closeAuthModal();
-    loadQuizProgress();
-}
-
-function loginAsAdmin() {
-    currentUser = 'admin';
-    userName.textContent = 'Admin';
-    loginBtn.style.display = 'none';
-    signupBtn.style.display = 'none';
-    logoutBtn.style.display = 'inline-block';
-    closeAuthModal();
-    showAdminDashboard();
-}
-
-function logout() {
-    $.ajax({
-        url: 'auth.php',
-        method: 'POST',
-        data: { action: 'logout' },
-        dataType: 'json',
-        beforeSend: showLoading,
-        complete: hideLoading,
-        success: function(response) {
-            if (response.success) {
-                currentUser = null;
-                userName.textContent = '';
-                loginBtn.style.display = 'inline-block';
-                signupBtn.style.display = 'inline-block';
-                logoutBtn.style.display = 'none';
-                quizContainer.style.display = 'none';
-                adminDashboard.style.display = 'none';
-                landingPage.style.display = 'block';
-            }
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.error("AJAX error: " + textStatus + ' : ' + errorThrown);
-            alert("An error occurred. Please try again.");
-        }
-    });
-}
-
-function startQuiz() {
-    if (currentUser) {
-        landingPage.style.display = 'none';
-        quizContainer.style.display = 'block';
-        loadQuestion();
-    } else {
-        authMessage.textContent = 'Please login or sign up to start the quiz.';
-        showAuthForm('Login');
-    }
-}
-
-function loadQuizProgress() {
-    $.ajax({
-        url: 'quiz.php',
-        method: 'POST',
-        data: { action: 'get_progress' },
-        dataType: 'json',
-        beforeSend: showLoading,
-        complete: hideLoading,
-        success: function(response) {
-            if (response.success) {
-                updateProgressBar(response.progress);
-            }
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.error("AJAX error: " + textStatus + ' : ' + errorThrown);
-            alert("An error occurred. Please try again.");
-        }
-    });
-}
 
 function loadQuestion() {
     const section = quizData[currentSection];
     const questionData = section.questions[currentQuestion];
     
-    sectionTitle.textContent = section.title;
+    document.getElementById('section-title').textContent = section.title;
     
     let questionHTML = `
         <h3>${questionData.question}</h3>
@@ -287,11 +290,19 @@ function loadQuestion() {
         </div>
     `;
     
-    questionContainer.innerHTML = questionHTML;
+    document.getElementById('question-container').innerHTML = questionHTML;
+
+    // Load saved answer if exists
+    const userProgress = users[currentUser].quizProgress;
+    if (userProgress[currentSection] && userProgress[currentSection][currentQuestion]) {
+        const savedRating = userProgress[currentSection][currentQuestion];
+        document.querySelector(`input[name="rating"][value="${savedRating}"]`).checked = true;
+    }
+
     updateProgressBar();
 }
 
-function previousQuestion() {
+document.getElementById('prev-btn').addEventListener('click', () => {
     if (currentQuestion > 0) {
         currentQuestion--;
     } else if (currentSection > 0) {
@@ -299,9 +310,9 @@ function previousQuestion() {
         currentQuestion = quizData[currentSection].questions.length - 1;
     }
     loadQuestion();
-}
+});
 
-function nextQuestion() {
+document.getElementById('next-btn').addEventListener('click', () => {
     saveAnswer();
     if (currentQuestion < quizData[currentSection].questions.length - 1) {
         currentQuestion++;
@@ -313,175 +324,112 @@ function nextQuestion() {
         return;
     }
     loadQuestion();
-}
+});
 
 function saveAnswer() {
     const selectedRating = document.querySelector('input[name="rating"]:checked');
     if (selectedRating) {
-        $.ajax({
-            url: 'quiz.php',
-            method: 'POST',
-            data: {
-                action: 'save_answer',
-                section: currentSection,
-                question: currentQuestion,
-                answer: selectedRating.value
-            },
-            dataType: 'json',
-            beforeSend: showLoading,
-            complete: hideLoading,
-            success: function(response) {
-                if (response.success) {
-                    updateProgressBar();
-                }
-            },
-            error: function(jqXHR, textStatus, errorThrown) {
-                console.error("AJAX error: " + textStatus + ' : ' + errorThrown);
-                alert("An error occurred. Please try again.");
-            }
-        });
+        if (!users[currentUser].quizProgress[currentSection]) {
+            users[currentUser].quizProgress[currentSection] = {};
+        }
+        users[currentUser].quizProgress[currentSection][currentQuestion] = parseInt(selectedRating.value);
+        localStorage.setItem('users', JSON.stringify(users));
     }
-}
-
-function updateProgressBar(progress) {
-    const totalQuestions = quizData.reduce((sum, section) => sum + section.questions.length, 0);
-    const answeredQuestions = progress ? progress.length : currentSection * quizData[0].questions.length + currentQuestion + 1;
-    const percentage = (answeredQuestions / totalQuestions) * 100;
-    document.querySelector('.progress').style.width = `${percentage}%`;
+    updateProgressBar();
 }
 
 function showResults() {
+    let resultsHTML = "<h2>Your Assessment Results</h2>";
     let totalScore = 0;
     let totalQuestions = 0;
-    let sectionScores = {};
+    let sectionAverages = [];
     
     quizData.forEach((section, sectionIndex) => {
-        sectionScores[sectionIndex] = 0;
+        let sectionTotal = 0;
+        let sectionCount = 0;
+        
+        resultsHTML += `<h3>${section.title}</h3>`;
+        resultsHTML += `<table class="results-table">
+                            <tr>
+                                <th>Question</th>
+                                <th>Your Score</th>
+                            </tr>`;
+        
         section.questions.forEach((question, questionIndex) => {
-            $.ajax({
-                url: 'quiz.php',
-                method: 'POST',
-                data: {
-                    action: 'get_answer',
-                    section: sectionIndex,
-                    question: questionIndex
-                },
-                dataType: 'json',
-                async: false,
-                beforeSend: showLoading,
-                complete: hideLoading,
-                success: function(response) {
-                    if (response.success && response.answer) {
-                        totalScore += parseInt(response.answer);
-                        sectionScores[sectionIndex] += parseInt(response.answer);
-                        totalQuestions++;
-                    }
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error("AJAX error: " + textStatus + ' : ' + errorThrown);
-                    alert("An error occurred. Please try again.");
-                }
-            });
+            const answer = users[currentUser].quizProgress[sectionIndex] && users[currentUser].quizProgress[sectionIndex][questionIndex];
+            if (answer) {
+                resultsHTML += `<tr>
+                                    <td>${question.question}</td>
+                                    <td>${answer}</td>
+                                </tr>`;
+                sectionTotal += answer;
+                sectionCount++;
+                totalScore += answer;
+                totalQuestions++;
+            }
         });
+        
+        const sectionAverage = sectionCount > 0 ? (sectionTotal / sectionCount).toFixed(2) : "N/A";
+        sectionAverages.push(parseFloat(sectionAverage));
+        resultsHTML += `</table>
+                        <p class="section-summary">Section Average: ${sectionAverage}</p>
+                        <p class="section-summary">Section Total: ${sectionTotal}</p>`;
     });
     
-    const averageScore = totalScore / totalQuestions;
+    const overallAverage = (totalScore / totalQuestions).toFixed(2);
+    resultsHTML += `<h3>Overall Results</h3>
+                    <p class="overall-summary">Total Score: ${totalScore}</p>
+                    <p class="overall-summary">Overall Average: ${overallAverage}</p>`;
     
-    $.ajax({
-        url: 'quiz.php',
-        method: 'POST',
+    resultsHTML += '<canvas id="resultsChart" width="400" height="200"></canvas>';
+    
+    resultsHTML += '<button onclick="location.reload()" class="btn-primary">Back to Home</button>';
+    
+    quizContainer.innerHTML = resultsHTML;
+    
+    // Create bar chart
+    createBarChart(sectionAverages);
+}
+
+function createBarChart(sectionAverages) {
+    const ctx = document.getElementById('resultsChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
         data: {
-            action: 'update_status',
-            completed: true,
-            score: averageScore
+            labels: quizData.map(section => section.title.split(':')[0]),
+            datasets: [{
+                label: 'Section Averages',
+                data: sectionAverages,
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
         },
-        dataType: 'json',
-        beforeSend: showLoading,
-        complete: hideLoading,
-        success: function(response) {
-            if (response.success) {
-                let resultsHTML = `<h2>Quiz Completed</h2>
-                                   <p>Your overall average score: ${averageScore.toFixed(2)}</p>
-                                   <h3>Section Scores:</h3>`;
-                
-                for (let i = 0; i < quizData.length; i++) {
-                    const sectionAverage = sectionScores[i] / quizData[i].questions.length;
-                    resultsHTML += `<p>${quizData[i].title}: ${sectionAverage.toFixed(2)}</p>`;
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 5
                 }
-                
-                resultsHTML += `<button onclick="location.reload()">Back to Home</button>`;
-                quizContainer.innerHTML = resultsHTML;
+            },
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Skills Assessment Summary'
+                }
             }
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.error("AJAX error: " + textStatus + ' : ' + errorThrown);
-            alert("An error occurred. Please try again.");
         }
     });
 }
 
-function showAdminDashboard() {
-    hideAllSections();
-    adminDashboard.style.display = 'block';
-    updateAdminDashboard();
+function updateProgressBar() {
+    const totalQuestions = quizData.reduce((sum, section) => sum + section.questions.length, 0);
+    const answeredQuestions = Object.values(users[currentUser].quizProgress).reduce((sum, section) => sum + Object.keys(section).length, 0);
+    const progress = (answeredQuestions / totalQuestions) * 100;
+    document.querySelector('.progress').style.width = `${progress}%`;
 }
 
-function updateAdminDashboard() {
-    $.ajax({
-        url: 'admin.php',
-        method: 'GET',
-        data: { action: 'get_stats' },
-        dataType: 'json',
-        beforeSend: showLoading,
-        complete: hideLoading,
-        success: function(response) {
-            if (response.success) {
-                document.getElementById('total-users').textContent = response.stats.total_users;
-                document.getElementById('completed-users').textContent = response.stats.completed_users;
-                document.getElementById('incomplete-users').textContent = response.stats.incomplete_users;
-            }
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.error("AJAX error: " + textStatus + ' : ' + errorThrown);
-            alert("An error occurred. Please try again.");
-        }
-    });
-
-    $.ajax({
-        url: 'admin.php',
-        method: 'GET',
-        data: { action: 'get_user_list' },
-        dataType: 'json',
-        beforeSend: showLoading,
-        complete: hideLoading,
-        success: function(response) {
-            if (response.success) {
-                const userTableBody = document.querySelector('#user-table tbody');
-                userTableBody.innerHTML = '';
-
-                response.users.forEach(user => {
-                    const row = document.createElement('tr');
-                    const nameCell = document.createElement('td');
-                    const statusCell = document.createElement('td');
-                    const scoreCell = document.createElement('td');
-
-                    nameCell.textContent = user.username;
-                    statusCell.textContent = user.status;
-                    scoreCell.textContent = user.score !== null ? user.score : 'N/A';
-
-                    row.appendChild(nameCell);
-                    row.appendChild(statusCell);
-                    row.appendChild(scoreCell);
-                    userTableBody.appendChild(row);
-                });
-            }
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.error("AJAX error: " + textStatus + ' : ' + errorThrown);
-            alert("An error occurred. Please try again.");
-        }
-    });
-}
 function hideAllSections() {
     landingPage.style.display = 'none';
     authContainer.style.display = 'none';
@@ -489,47 +437,7 @@ function hideAllSections() {
     adminDashboard.style.display = 'none';
 }
 
-function showLoading() {
-    // Show a loading spinner or message
-    document.body.style.cursor = 'wait';
-    // You can add a loading spinner element here if you want
-    // For example: document.getElementById('loading-spinner').style.display = 'block';
-}
-
-function hideLoading() {
-    // Hide the loading spinner or message
-    document.body.style.cursor = 'default';
-    // If you added a loading spinner element, hide it here
-    // For example: document.getElementById('loading-spinner').style.display = 'none';
-}
-
-function checkSession() {
-    $.ajax({
-        url: 'auth.php',
-        method: 'POST',
-        data: { action: 'check_session' },
-        dataType: 'json',
-        success: function(response) {
-            if (response.logged_in) {
-                login(response.username);
-                if (response.is_admin) {
-                    loginAsAdmin();
-                }
-            }
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.error("AJAX error: " + textStatus + ' : ' + errorThrown);
-        }
-    });
-}
-
 // Initial setup
-quizContainer.style.display = 'none';
-authContainer.style.display = 'none';
+document.getElementById('quiz-container').style.display = 'none';
+document.getElementById('auth-container').style.display = 'none';
 adminDashboard.style.display = 'none';
-
-// Check session when the page loads
-window.addEventListener('load', checkSession);
-
-
-
