@@ -1,106 +1,11 @@
-quiz
-
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+echo "Auth.php is running.<br>";
+
 session_start();
 require_once 'db_connect.php';
 
-function saveAnswer($userId, $section, $question, $answer) {
-    global $pdo;
-    $stmt = $pdo->prepare("INSERT INTO quiz_answers (user_id, section, question, answer) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer = ?");
-    return $stmt->execute([$userId, $section, $question, $answer, $answer]);
-}
-
-function getQuizProgress($userId) {
-    global $pdo;
-    $stmt = $pdo->prepare("SELECT * FROM quiz_answers WHERE user_id = ?");
-    $stmt->execute([$userId]);
-    return $stmt->fetchAll();
-}
-
-function updateQuizStatus($userId, $completed, $score) {
-    global $pdo;
-    $stmt = $pdo->prepare("UPDATE quiz_progress SET completed = ?, score = ? WHERE user_id = ?");
-    return $stmt->execute([$completed, $score, $userId]);
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SESSION['user_id'])) {
-    $action = $_POST['action'] ?? '';
-
-    switch ($action) {
-        case 'save_answer':
-            $section = $_POST['section'] ?? '';
-            $question = $_POST['question'] ?? '';
-            $answer = $_POST['answer'] ?? '';
-            if (saveAnswer($_SESSION['user_id'], $section, $question, $answer)) {
-                echo json_encode(['success' => true, 'message' => 'Answer saved']);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Failed to save answer']);
-            }
-            break;
-        case 'get_progress':
-            $progress = getQuizProgress($_SESSION['user_id']);
-            echo json_encode(['success' => true, 'progress' => $progress]);
-            break;
-        case 'update_status':
-            $completed = $_POST['completed'] ?? false;
-            $score = $_POST['score'] ?? null;
-            if (updateQuizStatus($_SESSION['user_id'], $completed, $score)) {
-                echo json_encode(['success' => true, 'message' => 'Quiz status updated']);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Failed to update quiz status']);
-            }
-            break;
-    }
-}
-?>
-
-admin
-
-<?php
-session_start();
-require_once 'db_connect.php';
-
-function getUserStats() {
-    global $pdo;
-    $stmt = $pdo->query("
-        SELECT 
-            COUNT(DISTINCT u.id) as total_users,
-            SUM(CASE WHEN qp.completed = 1 THEN 1 ELSE 0 END) as completed_users,
-            SUM(CASE WHEN qp.completed = 0 THEN 1 ELSE 0 END) as incomplete_users
-        FROM users u
-        LEFT JOIN quiz_progress qp ON u.id = qp.user_id
-        WHERE u.is_admin = 0
-    ");
-    return $stmt->fetch();
-}
-
-function getUserList() {
-    global $pdo;
-    $stmt = $pdo->query("
-        SELECT 
-            u.username,
-            CASE WHEN qp.completed = 1 THEN 'Completed' ELSE 'Incomplete' END as status,
-            qp.score
-        FROM users u
-        LEFT JOIN quiz_progress qp ON u.id = qp.user_id
-        WHERE u.is_admin = 0
-        ORDER BY u.username
-    ");
-    return $stmt->fetchAll();
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
-    $action = $_GET['action'] ?? '';
-
-    switch ($action) {
-        case 'get_stats':
-            $stats = getUserStats();
-            echo json_encode(['success' => true, 'stats' => $stats]);
-            break;
-        case 'get_user_list':
-            $users = getUserList();
-            echo json_encode(['success' => true, 'users' => $users]);
-            break;
-    }
-}
-?>
+// Rest of your auth.php code...
