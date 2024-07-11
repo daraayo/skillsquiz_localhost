@@ -18,3 +18,7 @@ try {
     throw new \PDOException($e->getMessage(), (int)$e->getCode());
 }
 ?>
+
+
+INSERT INTO users (username, password, is_admin)
+VALUES ('admin', '$2y$10$...hashed_password...', 1);
