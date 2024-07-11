@@ -1,24 +1,89 @@
 <?php
-$host = 'localhost';
-$db   = 'skills_assessment_quiz';
-$user = 'root';
-$pass = '';
-$charset = 'utf8mb4';
+session_start();
+require_once 'db_connect.php';
 
-$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
-];
+function createAdminIfNotExists() {
+    global $pdo;
+    $adminUsername = "admin";
+    $adminPassword = "your_admin_password"; // Change this to a secure password
+    
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
+    $stmt->execute([$adminUsername]);
+    $user = $stmt->fetch();
+    
+    if (!$user) {
+        $hashed_password = password_hash($adminPassword, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("INSERT INTO users (username, password, is_admin) VALUES (?, ?, 1)");
+        $stmt->execute([$adminUsername, $hashed_password]);
+    }
+}
 
-try {
-    $pdo = new PDO($dsn, $user, $pass, $options);
-} catch (\PDOException $e) {
-    throw new \PDOException($e->getMessage(), (int)$e->getCode());
+createAdminIfNotExists();
+
+function register($username, $password) {
+    global $pdo;
+    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    $stmt = $pdo->prepare("INSERT INTO users (username, password) VALUES (?, ?)");
+    if ($stmt->execute([$username, $hashed_password])) {
+        $user_id = $pdo->lastInsertId();
+        $stmt = $pdo->prepare("INSERT INTO quiz_progress (user_id) VALUES (?)");
+        return $stmt->execute([$user_id]);
+    }
+    return false;
+}
+
+function login($username, $password) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
+    $stmt->execute([$username]);
+    $user = $stmt->fetch();
+    if ($user && password_verify($password, $user['password'])) {
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
+        $_SESSION['is_admin'] = $user['is_admin'];
+        return true;
+    }
+    return false;
+}
+
+function logout() {
+    session_unset();
+    session_destroy();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    $username = $_POST['username'] ?? '';
+    $password = $_POST['password'] ?? '';
+
+    switch ($action) {
+        case 'register':
+            if ($username === 'admin') {
+                echo json_encode(['success' => false, 'message' => 'Cannot register as admin']);
+            } elseif (register($username, $password)) {
+                echo json_encode(['success' => true, 'message' => 'Registration successful']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Registration failed']);
+            }
+            break;
+        case 'login':
+            if (login($username, $password)) {
+                echo json_encode(['success' => true, 'message' => 'Login successful', 'is_admin' => $_SESSION['is_admin']]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Invalid credentials']);
+            }
+            break;
+        case 'logout':
+            logout();
+            echo json_encode(['success' => true, 'message' => 'Logout successful']);
+            break;
+        case 'check_session':
+            if (isset($_SESSION['user_id'])) {
+                echo json_encode(['logged_in' => true, 'username' => $_SESSION['username'], 'is_admin' => $_SESSION['is_admin']]);
+            } else {
+                echo json_encode(['logged_in' => false]);
+            }
+            break;
+    }
 }
 ?>
-
-
-INSERT INTO users (username, password, is_admin)
-VALUES ('admin', '$2y$10$...hashed_password...', 1);
