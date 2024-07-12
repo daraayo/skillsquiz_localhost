@@ -9,3 +9,39 @@ session_start();
 require_once 'db_connect.php';
 
 // Rest of your auth.php code...
+
+
+function handleAuth(e) {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const action = authTitle.textContent === 'Sign Up' ? 'register' : 'login';
+
+    $.ajax({
+        url: 'auth.php',
+        method: 'POST',
+        data: { action, username, password },
+        dataType: 'json',
+        beforeSend: showLoading,
+        complete: hideLoading,
+        success: function(response) {
+            console.log('Response:', response);  // Add this line
+            if (response.success) {
+                if (action === 'login' && response.is_admin) {
+                    loginAsAdmin();
+                } else {
+                    login(username);
+                }
+            } else {
+                authMessage.textContent = response.message;
+            }
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.error("AJAX error:", textStatus, errorThrown);
+            console.error("Response Text:", jqXHR.responseText);
+            alert("An error occurred. Please check the console for more information.");
+        }
+    });
+}
